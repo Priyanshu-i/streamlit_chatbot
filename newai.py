@@ -111,17 +111,17 @@ def main():
 
     # Sidebar Chat History: Each date has an expander with exchanges grouped together
     st.sidebar.header("Chat History")
-    for date, chats in st.session_state.chat_history.items():
+    # Sort dates in descending order (newest first)
+    for date in sorted(st.session_state.chat_history.keys(), key=lambda d: datetime.strptime(d, "%d-%m-%Y"), reverse=True):
+        chats = st.session_state.chat_history[date]
         with st.sidebar.expander(date, expanded=False):
             i = 0
             while i < len(chats):
                 with st.container():
-                    # Check if we have a user message (and then optionally an AI response)
                     if chats[i]["user"] == "You":
                         st.write(f"**You:** {chats[i]['message']}")
                         user_msg_index = i
                         i += 1
-                        # If the next message is from AI (or Ollama), display it as a reply
                         if i < len(chats) and chats[i]["user"] in ["Ollama", "AI 🤖 "]:
                             st.write(f"**{chats[i]['user']}:** {chats[i]['message']}")
                             ai_msg_index = i
@@ -129,13 +129,11 @@ def main():
                         else:
                             ai_msg_index = None
                     else:
-                        # If it starts with an AI message (or any other sender)
                         st.write(f"**{chats[i]['user']}:** {chats[i]['message']}")
                         user_msg_index = i
                         ai_msg_index = None
                         i += 1
 
-                    # Delete button for this exchange
                     if st.button("Delete Exchange", key=f"delete_exchange_{date}_{user_msg_index}"):
                         indices_to_delete = [user_msg_index]
                         if ai_msg_index is not None:
@@ -144,7 +142,6 @@ def main():
                         st.session_state.chat_history[date] = new_chats
                         save_all_chat_history(flatten_chat_history(st.session_state.chat_history))
                         st.rerun()
-                # Horizontal rule after each complete exchange
                 st.markdown("<hr>", unsafe_allow_html=True)
 
     # Main chat interface: Display current day's chat grouped into exchanges
@@ -181,7 +178,6 @@ def main():
                 ]
                 save_all_chat_history(flatten_chat_history(st.session_state.chat_history))
                 st.rerun()
-        # Horizontal rule after each exchange in the main window
         st.markdown("<hr>", unsafe_allow_html=True)
 
     # Fixed input box at the bottom using a form (clear_on_submit ensures the box clears after sending)
@@ -189,7 +185,6 @@ def main():
         user_input = st.text_input("You:")
         submitted = st.form_submit_button("Send")
         if submitted and user_input:
-            # Append user's message
             chat_entry_user = {
                 "timestamp": datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
                 "user": "You",
@@ -207,7 +202,6 @@ def main():
                 full_response += chunk
                 response_container.markdown(full_response)
             
-            # Append AI's response
             chat_entry_ai = {
                 "timestamp": datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
                 "user": "AI 🤖 ",
@@ -215,7 +209,6 @@ def main():
             }
             st.session_state.chat_history.setdefault(today, []).append(chat_entry_ai)
             append_chat_entry(chat_entry_ai)
-            # Render a horizontal rule after the AI chat is complete
             st.markdown("---")
             st.rerun()
 
