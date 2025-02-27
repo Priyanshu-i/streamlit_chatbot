@@ -109,10 +109,14 @@ def main():
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = load_chat_history()
 
-    # Sidebar Chat History: Each date has an expander with exchanges grouped together
+    # Sidebar Chat History: Sorted date-wise (newest first)
     st.sidebar.header("Chat History")
-    # Sort dates in descending order (newest first)
-    for date in sorted(st.session_state.chat_history.keys(), key=lambda d: datetime.strptime(d, "%d-%m-%Y"), reverse=True):
+    sorted_dates = sorted(
+        st.session_state.chat_history.keys(), 
+        key=lambda d: datetime.strptime(d, "%d-%m-%Y"), 
+        reverse=True
+    )
+    for date in sorted_dates:
         chats = st.session_state.chat_history[date]
         with st.sidebar.expander(date, expanded=False):
             i = 0
@@ -120,6 +124,7 @@ def main():
                 with st.container():
                     if chats[i]["user"] == "You":
                         st.write(f"**You:** {chats[i]['message']}")
+                        exchange_timestamp = chats[i]["timestamp"]
                         user_msg_index = i
                         i += 1
                         if i < len(chats) and chats[i]["user"] in ["Ollama", "AI 🤖 "]:
@@ -130,18 +135,27 @@ def main():
                             ai_msg_index = None
                     else:
                         st.write(f"**{chats[i]['user']}:** {chats[i]['message']}")
+                        exchange_timestamp = chats[i]["timestamp"]
                         user_msg_index = i
                         ai_msg_index = None
                         i += 1
 
-                    if st.button("Delete Exchange", key=f"delete_exchange_{date}_{user_msg_index}"):
-                        indices_to_delete = [user_msg_index]
-                        if ai_msg_index is not None:
-                            indices_to_delete.append(ai_msg_index)
-                        new_chats = [chat for idx, chat in enumerate(chats) if idx not in indices_to_delete]
-                        st.session_state.chat_history[date] = new_chats
-                        save_all_chat_history(flatten_chat_history(st.session_state.chat_history))
-                        st.rerun()
+                    # Delete button and right-aligned timestamp in sidebar
+                    cols = st.columns([3, 1])
+                    with cols[0]:
+                        if st.button("Delete Exchange", key=f"delete_exchange_{date}_{user_msg_index}"):
+                            indices_to_delete = [user_msg_index]
+                            if ai_msg_index is not None:
+                                indices_to_delete.append(ai_msg_index)
+                            new_chats = [chat for idx, chat in enumerate(chats) if idx not in indices_to_delete]
+                            st.session_state.chat_history[date] = new_chats
+                            save_all_chat_history(flatten_chat_history(st.session_state.chat_history))
+                            st.rerun()
+                    with cols[1]:
+                        st.markdown(
+                            f"<p style='text-align: right; font-size: 10px; color: grey;'>{exchange_timestamp}</p>",
+                            unsafe_allow_html=True,
+                        )
                 st.markdown("<hr>", unsafe_allow_html=True)
 
     # Main chat interface: Display current day's chat grouped into exchanges
@@ -152,32 +166,43 @@ def main():
     i = 0
     while i < len(st.session_state.chat_history[today]):
         with st.container():
+            # Print without the timestamp prefix in the message header
             if st.session_state.chat_history[today][i]["user"] == "You":
-                st.write(f"**{st.session_state.chat_history[today][i]['timestamp']} - You:** {st.session_state.chat_history[today][i]['message']}")
+                st.write(f"**You:** {st.session_state.chat_history[today][i]['message']}")
+                exchange_timestamp = st.session_state.chat_history[today][i]["timestamp"]
                 user_msg_index = i
                 i += 1
                 if i < len(st.session_state.chat_history[today]) and st.session_state.chat_history[today][i]["user"] in ["AI 🤖 ", "Ollama"]:
-                    st.write(f"**{st.session_state.chat_history[today][i]['timestamp']} - {st.session_state.chat_history[today][i]['user']}:** {st.session_state.chat_history[today][i]['message']}")
+                    st.write(f"**{st.session_state.chat_history[today][i]['user']}:** {st.session_state.chat_history[today][i]['message']}")
                     ai_msg_index = i
                     i += 1
                 else:
                     ai_msg_index = None
             else:
-                st.write(f"**{st.session_state.chat_history[today][i]['timestamp']} - {st.session_state.chat_history[today][i]['user']}:** {st.session_state.chat_history[today][i]['message']}")
+                st.write(f"**{st.session_state.chat_history[today][i]['user']}:** {st.session_state.chat_history[today][i]['message']}")
+                exchange_timestamp = st.session_state.chat_history[today][i]["timestamp"]
                 user_msg_index = i
                 ai_msg_index = None
                 i += 1
 
-            if st.button("Delete Exchange", key=f"delete_main_{today}_{user_msg_index}"):
-                indices_to_delete = [user_msg_index]
-                if ai_msg_index is not None:
-                    indices_to_delete.append(ai_msg_index)
-                st.session_state.chat_history[today] = [
-                    chat for idx, chat in enumerate(st.session_state.chat_history[today])
-                    if idx not in indices_to_delete
-                ]
-                save_all_chat_history(flatten_chat_history(st.session_state.chat_history))
-                st.rerun()
+            # Delete button and right-aligned timestamp in main interface
+            cols = st.columns([3, 1])
+            with cols[0]:
+                if st.button("Delete Exchange", key=f"delete_main_{today}_{user_msg_index}"):
+                    indices_to_delete = [user_msg_index]
+                    if ai_msg_index is not None:
+                        indices_to_delete.append(ai_msg_index)
+                    st.session_state.chat_history[today] = [
+                        chat for idx, chat in enumerate(st.session_state.chat_history[today])
+                        if idx not in indices_to_delete
+                    ]
+                    save_all_chat_history(flatten_chat_history(st.session_state.chat_history))
+                    st.rerun()
+            with cols[1]:
+                st.markdown(
+                    f"<p style='text-align: right; font-size: 10px; color: grey;'>{exchange_timestamp}</p>",
+                    unsafe_allow_html=True,
+                )
         st.markdown("<hr>", unsafe_allow_html=True)
 
     # Fixed input box at the bottom using a form (clear_on_submit ensures the box clears after sending)
@@ -185,6 +210,7 @@ def main():
         user_input = st.text_input("You:")
         submitted = st.form_submit_button("Send")
         if submitted and user_input:
+            # Append user's message and save to JSON (with timestamp)
             chat_entry_user = {
                 "timestamp": datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
                 "user": "You",
@@ -202,6 +228,7 @@ def main():
                 full_response += chunk
                 response_container.markdown(full_response)
             
+            # Append AI's response and save to JSON
             chat_entry_ai = {
                 "timestamp": datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
                 "user": "AI 🤖 ",
@@ -209,6 +236,7 @@ def main():
             }
             st.session_state.chat_history.setdefault(today, []).append(chat_entry_ai)
             append_chat_entry(chat_entry_ai)
+            
             st.markdown("---")
             st.rerun()
 
